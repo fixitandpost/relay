@@ -5,3 +5,9 @@
 /internal/core/VERSION
 /internal/servers/hls/hls.min.js
 /internal/staticsources/rpicamera/mtxrpicam_*/
+
+# UI
+/ui/node_modules
+/ui/dist
+/ui/dist-electron
+/ui/release
