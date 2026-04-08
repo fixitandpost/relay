@@ -13,12 +13,28 @@ import { useFlowStore } from './store'
 import { Sidebar } from './components/Sidebar'
 import { Toolbar } from './components/Toolbar'
 import { CameraNode } from './nodes/CameraNode'
+import { RTSPSourceNode } from './nodes/RTSPSourceNode'
+import { RTMPSourceNode } from './nodes/RTMPSourceNode'
+import { SRTSourceNode } from './nodes/SRTSourceNode'
+import { HLSSourceNode } from './nodes/HLSSourceNode'
 import { RTSPOutputNode } from './nodes/RTSPOutputNode'
+import { RTMPOutputNode } from './nodes/RTMPOutputNode'
+import { HLSOutputNode } from './nodes/HLSOutputNode'
+import { WebRTCOutputNode } from './nodes/WebRTCOutputNode'
+import { SRTOutputNode } from './nodes/SRTOutputNode'
 import type { PipelineStatusUpdate } from './types'
 
 const nodeTypes = {
   camera: CameraNode,
+  rtspSource: RTSPSourceNode,
+  rtmpSource: RTMPSourceNode,
+  srtSource: SRTSourceNode,
+  hlsSource: HLSSourceNode,
   rtspOutput: RTSPOutputNode,
+  rtmpOutput: RTMPOutputNode,
+  hlsOutput: HLSOutputNode,
+  webrtcOutput: WebRTCOutputNode,
+  srtOutput: SRTOutputNode,
 }
 
 const defaultEdgeOptions = {
