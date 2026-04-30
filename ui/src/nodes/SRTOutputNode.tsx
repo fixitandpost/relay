@@ -1,6 +1,7 @@
 import { Handle, Position } from '@xyflow/react'
 import type { NodeProps } from '@xyflow/react'
 import { useFlowStore } from '../store'
+import { WHEPPreview } from '../components/WHEPPreview'
 import type { SRTOutputNodeData } from '../types'
 
 export function SRTOutputNode({ id, data }: NodeProps) {
@@ -11,10 +12,11 @@ export function SRTOutputNode({ id, data }: NodeProps) {
   return (
     <div className={`flow-node ${d.status === 'streaming' ? 'streaming' : ''}`}>
       <Handle type="target" position={Position.Left} id="video-in" />
-      <div className="node-header output">
+      <div className="node-header output output-srt">
         <span className="node-icon">{'\u{1F50C}'}</span>
         <span>SRT Output</span>
       </div>
+      <WHEPPreview path={d.path} active={d.status === 'streaming'} />
       <div className="node-body">
         <div className="node-field">
           <label>Path</label>

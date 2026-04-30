@@ -14,6 +14,7 @@ export interface CameraNodeData {
   device: string
   deviceIndex: number
   resolution: string
+  activePath?: string
   status: NodeStatus
   error?: string
   [key: string]: unknown
@@ -22,6 +23,7 @@ export interface CameraNodeData {
 export interface RTSPSourceNodeData {
   label: string
   url: string
+  activePath?: string
   status: NodeStatus
   error?: string
   [key: string]: unknown
@@ -30,6 +32,7 @@ export interface RTSPSourceNodeData {
 export interface RTMPSourceNodeData {
   label: string
   url: string
+  activePath?: string
   status: NodeStatus
   error?: string
   [key: string]: unknown
@@ -38,6 +41,7 @@ export interface RTMPSourceNodeData {
 export interface SRTSourceNodeData {
   label: string
   url: string
+  activePath?: string
   status: NodeStatus
   error?: string
   [key: string]: unknown
@@ -46,9 +50,17 @@ export interface SRTSourceNodeData {
 export interface HLSSourceNodeData {
   label: string
   url: string
+  activePath?: string
   status: NodeStatus
   error?: string
   [key: string]: unknown
+}
+
+export interface LogEntry {
+  id: string
+  pipelineId: string
+  message: string
+  timestamp: number
 }
 
 /* ── Output types ── */
@@ -101,7 +113,7 @@ export interface SRTOutputNodeData {
 /* ── Pipeline config ── */
 
 export type PipelineSource =
-  | { type: 'camera'; device: string; index: number }
+  | { type: 'camera'; device: string; index: number; resolution: string }
   | { type: 'rtspSource'; url: string }
   | { type: 'rtmpSource'; url: string }
   | { type: 'srtSource'; url: string }
@@ -110,7 +122,7 @@ export type PipelineSource =
 export interface PipelineConfig {
   id: string
   source: PipelineSource
-  output: { path: string; port: number }
+  output: { path: string }
 }
 
 export interface PipelineStatusUpdate {
@@ -127,9 +139,9 @@ declare global {
       stopPipeline: (id: string) => Promise<void>
       stopAll: () => Promise<void>
       requestCamera: () => Promise<boolean>
-      onPipelineStatus: (callback: (data: PipelineStatusUpdate) => void) => void
-      onPipelineLog: (callback: (data: { id: string; message: string }) => void) => void
-      removeAllListeners: (channel: string) => void
+      onPipelineStatus: (callback: (data: PipelineStatusUpdate) => void) => () => void
+      onPipelineLog: (callback: (data: { id: string; message: string }) => void) => () => void
+      onCameraGranted: (callback: () => void) => () => void
     }
   }
 }

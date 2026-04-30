@@ -1,4 +1,4 @@
-import { DragEvent } from 'react'
+import { DragEvent, useState } from 'react'
 import { useFlowStore } from '../store'
 
 const nodeTypes = [
@@ -76,6 +76,8 @@ const nodeTypes = [
 
 export function Sidebar() {
   const { addNode } = useFlowStore()
+  const [sourcesOpen, setSourcesOpen] = useState(true)
+  const [outputsOpen, setOutputsOpen] = useState(true)
 
   const onDragStart = (event: DragEvent, nodeType: string) => {
     event.dataTransfer.setData('application/reactflow', nodeType)
@@ -83,21 +85,26 @@ export function Sidebar() {
   }
 
   const onClick = (nodeType: string) => {
-    // Sources go on the left, outputs on the right — natural flow direction
     const offsetY = Math.round(Math.random() * 80 - 40)
     const isSource = nodeTypes.find((n) => n.type === nodeType)?.category === 'source'
     const baseX = isSource ? 100 : 600
     addNode(nodeType, { x: baseX + Math.round(Math.random() * 40 - 20), y: 150 + offsetY })
   }
 
+  const sources = nodeTypes.filter((n) => n.category === 'source')
+  const outputs = nodeTypes.filter((n) => n.category === 'output')
+
   return (
     <div className="sidebar">
       <div className="sidebar-header">Nodes</div>
       <div className="sidebar-section">
-        <div className="sidebar-section-title">Sources</div>
-        {nodeTypes
-          .filter((n) => n.category === 'source')
-          .map((node) => (
+        <button className="sidebar-section-toggle" onClick={() => setSourcesOpen(!sourcesOpen)}>
+          <span className={`sidebar-chevron ${sourcesOpen ? 'open' : ''}`} />
+          <span className="sidebar-section-title">Sources</span>
+          <span className="sidebar-section-count">{sources.length}</span>
+        </button>
+        {sourcesOpen &&
+          sources.map((node) => (
             <div
               key={node.type}
               className="sidebar-node source"
@@ -115,10 +122,13 @@ export function Sidebar() {
           ))}
       </div>
       <div className="sidebar-section">
-        <div className="sidebar-section-title">Outputs</div>
-        {nodeTypes
-          .filter((n) => n.category === 'output')
-          .map((node) => (
+        <button className="sidebar-section-toggle" onClick={() => setOutputsOpen(!outputsOpen)}>
+          <span className={`sidebar-chevron ${outputsOpen ? 'open' : ''}`} />
+          <span className="sidebar-section-title">Outputs</span>
+          <span className="sidebar-section-count">{outputs.length}</span>
+        </button>
+        {outputsOpen &&
+          outputs.map((node) => (
             <div
               key={node.type}
               className="sidebar-node output"

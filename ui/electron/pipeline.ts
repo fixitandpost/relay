@@ -8,13 +8,14 @@ interface PipelineSource {
   type: 'camera' | 'rtspSource' | 'rtmpSource' | 'srtSource' | 'hlsSource'
   device?: string
   index?: number
+  resolution?: string
   url?: string
 }
 
 interface PipelineConfig {
   id: string
   source: PipelineSource
-  output: { path: string; port: number }
+  output: { path: string }
 }
 
 interface CameraDevice {
@@ -23,6 +24,7 @@ interface CameraDevice {
 }
 
 const MEDIAMTX_API_PORT = 9997
+const MEDIAMTX_RTSP_PUBLISH_PORT = 8554
 
 // Ensure homebrew and common paths are available to spawned processes
 const PATH = [
@@ -36,6 +38,18 @@ const PATH = [
 ].join(':')
 
 const spawnEnv = { ...process.env, PATH }
+
+function parseResolution(resolution?: string): { width: number; height: number } {
+  const match = resolution?.match(/^(\d+)x(\d+)$/)
+  if (!match) {
+    return { width: 1280, height: 720 }
+  }
+
+  return {
+    width: parseInt(match[1], 10),
+    height: parseInt(match[2], 10),
+  }
+}
 
 function findBinary(name: string): string {
   const locations = ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin']
@@ -215,7 +229,11 @@ export class PipelineManager {
       this.mediamtxProcess = spawn(mediamtxPath, configArgs, {
         cwd: mediamtxCwd,
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: spawnEnv,
+        env: {
+          ...spawnEnv,
+          MTX_API: process.env.MTX_API ?? 'yes',
+          MTX_APIADDRESS: process.env.MTX_APIADDRESS ?? `127.0.0.1:${MEDIAMTX_API_PORT}`,
+        },
       })
 
       const timeout = setTimeout(() => resolve(true), 3000)
@@ -321,10 +339,14 @@ export class PipelineManager {
 
   private async startCameraPipeline(
     id: string,
-    source: { device?: string; index?: number },
-    output: { path: string; port: number }
+    source: { device?: string; index?: number; resolution?: string },
+    output: { path: string }
   ): Promise<void> {
-    const rtspUrl = `rtsp://localhost:${output.port}/${output.path}`
+    const { width, height } = parseResolution(source.resolution)
+
+    // Publish camera feeds to the internal RTSP ingest path, then let
+    // MediaMTX expose the same path through the selected read protocols.
+    const rtspUrl = `rtsp://127.0.0.1:${MEDIAMTX_RTSP_PUBLISH_PORT}/${output.path}`
     const platform = process.platform
 
     let ffmpegArgs: string[]
@@ -332,7 +354,7 @@ export class PipelineManager {
       ffmpegArgs = [
         '-f', 'avfoundation',
         '-framerate', '30',
-        '-video_size', '1280x720',
+        '-video_size', `${width}x${height}`,
         '-i', `${source.index}:none`,
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
@@ -346,7 +368,7 @@ export class PipelineManager {
       ffmpegArgs = [
         '-f', 'v4l2',
         '-framerate', '30',
-        '-video_size', '1280x720',
+        '-video_size', `${width}x${height}`,
         '-i', `/dev/video${source.index}`,
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
@@ -360,7 +382,7 @@ export class PipelineManager {
       ffmpegArgs = [
         '-f', 'dshow',
         '-framerate', '30',
-        '-video_size', '1280x720',
+        '-video_size', `${width}x${height}`,
         '-i', `video=${source.device}`,
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
@@ -404,7 +426,7 @@ export class PipelineManager {
   private async startURLSourcePipeline(
     id: string,
     source: PipelineSource,
-    output: { path: string; port: number }
+    output: { path: string }
   ): Promise<void> {
     const sourceUrl = source.url
     if (!sourceUrl) {
@@ -439,8 +461,12 @@ export class PipelineManager {
           `http://localhost:${MEDIAMTX_API_PORT}/v3/paths/get/${encodeURIComponent(path)}`
         )
         if (resp.ok) {
-          const data = await resp.json() as any
-          if (data.ready) {
+          const data = (await resp.json()) as {
+            ready?: boolean
+            available?: boolean
+            online?: boolean
+          }
+          if (data.online || data.available || data.ready) {
             this.sendStatus(id, 'streaming')
             return
           }

@@ -12,7 +12,7 @@ export function WebRTCOutputNode({ id, data }: NodeProps) {
   return (
     <div className={`flow-node ${d.status === 'streaming' ? 'streaming' : ''}`}>
       <Handle type="target" position={Position.Left} id="video-in" />
-      <div className="node-header output">
+      <div className="node-header output output-webrtc">
         <span className="node-icon">{'\u{1F30D}'}</span>
         <span>WebRTC Output</span>
       </div>

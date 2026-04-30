@@ -1,13 +1,10 @@
 import { useFlowStore } from '../store'
+import { validateFlow } from '../flow'
 
 export function Toolbar() {
   const { isRunning, startFlow, stopFlow, listCameras, edges, nodes } = useFlowStore()
-
-  const hasValidPipeline = edges.some((edge) => {
-    const source = nodes.find((n) => n.id === edge.source)
-    const target = nodes.find((n) => n.id === edge.target)
-    return source?.type === 'camera' && target?.type === 'rtspOutput'
-  })
+  const { pipelineEdges } = validateFlow(nodes, edges)
+  const hasValidPipeline = pipelineEdges.length > 0
 
   return (
     <div className="toolbar">

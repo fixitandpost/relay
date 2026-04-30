@@ -10,7 +10,7 @@ export function CameraNode({ id, data }: NodeProps) {
 
   return (
     <div className={`flow-node ${d.status === 'streaming' ? 'streaming' : ''}`}>
-      <div className="node-header source">
+      <div className="node-header source source-camera">
         <span className="node-icon">{'\u{1F4F9}'}</span>
         <span>Camera Source</span>
       </div>

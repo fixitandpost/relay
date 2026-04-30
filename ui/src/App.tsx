@@ -1,4 +1,4 @@
-import { useCallback, useEffect, DragEvent } from 'react'
+import { useCallback, useEffect, type DragEvent } from 'react'
 import {
   ReactFlow,
   Background,
@@ -7,11 +7,14 @@ import {
   ReactFlowProvider,
   useReactFlow,
   BackgroundVariant,
+  type Connection,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { useFlowStore } from './store'
+import { isValidConnectionBetweenNodes } from './flow'
 import { Sidebar } from './components/Sidebar'
 import { Toolbar } from './components/Toolbar'
+import { LogPanel } from './components/LogPanel'
 import { CameraNode } from './nodes/CameraNode'
 import { RTSPSourceNode } from './nodes/RTSPSourceNode'
 import { RTMPSourceNode } from './nodes/RTMPSourceNode'
@@ -44,25 +47,39 @@ const defaultEdgeOptions = {
 
 function Flow() {
   const { screenToFlowPosition } = useReactFlow()
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, listCameras, updatePipelineStatus } =
-    useFlowStore()
+  const {
+    nodes,
+    edges,
+    onNodesChange,
+    onEdgesChange,
+    onConnect,
+    addNode,
+    listCameras,
+    updatePipelineStatus,
+    addLog,
+  } = useFlowStore()
 
   useEffect(() => {
-    listCameras()
+    void listCameras()
 
     if (window.relay) {
-      window.relay.onPipelineStatus((data: PipelineStatusUpdate) => {
+      const unsubscribeStatus = window.relay.onPipelineStatus((data: PipelineStatusUpdate) => {
         updatePipelineStatus(data.id, data.status, data.error)
       })
-    }
+      const unsubscribeLogs = window.relay.onPipelineLog((data: { id: string; message: string }) => {
+        addLog(data.id, data.message)
+      })
+      const unsubscribeCameraGranted = window.relay.onCameraGranted(() => {
+        void listCameras()
+      })
 
-    return () => {
-      if (window.relay) {
-        window.relay.removeAllListeners('pipeline-status')
-        window.relay.removeAllListeners('pipeline-log')
+      return () => {
+        unsubscribeStatus()
+        unsubscribeLogs()
+        unsubscribeCameraGranted()
       }
     }
-  }, [])
+  }, [addLog, listCameras, updatePipelineStatus])
 
   const onDragOver = useCallback((event: DragEvent) => {
     event.preventDefault()
@@ -80,36 +97,45 @@ function Flow() {
     [screenToFlowPosition, addNode]
   )
 
+  const isValidConnection = useCallback(
+    (connection: Connection) => isValidConnectionBetweenNodes(nodes, connection),
+    [nodes]
+  )
+
   return (
     <div className="app">
       <Toolbar />
       <div className="app-body">
         <Sidebar />
-        <div className="canvas-wrapper">
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onDragOver={onDragOver}
-            onDrop={onDrop}
-            nodeTypes={nodeTypes}
-            defaultEdgeOptions={defaultEdgeOptions}
-            fitView
-            fitViewOptions={{ padding: 0.3, maxZoom: 0.85 }}
-            minZoom={0.2}
-            maxZoom={1.5}
-            proOptions={{ hideAttribution: true }}
-          >
-            <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#30363d" />
-            <Controls />
-            <MiniMap
-              style={{ background: '#161b22' }}
-              nodeColor="#30363d"
-              maskColor="rgba(0,0,0,0.3)"
-            />
-          </ReactFlow>
+        <div className="canvas-area">
+          <div className="canvas-wrapper">
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              onDragOver={onDragOver}
+              onDrop={onDrop}
+              nodeTypes={nodeTypes}
+              defaultEdgeOptions={defaultEdgeOptions}
+              isValidConnection={isValidConnection}
+              fitView
+              fitViewOptions={{ padding: 0.3, maxZoom: 0.85 }}
+              minZoom={0.2}
+              maxZoom={1.5}
+              proOptions={{ hideAttribution: true }}
+            >
+              <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#30363d" />
+              <Controls />
+              <MiniMap
+                style={{ background: '#161b22' }}
+                nodeColor="#30363d"
+                maskColor="rgba(0,0,0,0.3)"
+              />
+            </ReactFlow>
+          </div>
+          <LogPanel />
         </div>
       </div>
     </div>

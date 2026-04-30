@@ -12,7 +12,7 @@ export function RTMPOutputNode({ id, data }: NodeProps) {
   return (
     <div className={`flow-node ${d.status === 'streaming' ? 'streaming' : ''}`}>
       <Handle type="target" position={Position.Left} id="video-in" />
-      <div className="node-header output">
+      <div className="node-header output output-rtmp">
         <span className="node-icon">{'\u{1F4E4}'}</span>
         <span>RTMP Output</span>
       </div>

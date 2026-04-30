@@ -1,44 +1,39 @@
 import { create } from 'zustand'
 import {
-  applyNodeChanges,
-  applyEdgeChanges,
   addEdge,
-  type Node,
+  applyEdgeChanges,
+  applyNodeChanges,
   type Edge,
-  type OnNodesChange,
-  type OnEdgesChange,
+  type Node,
   type OnConnect,
+  type OnEdgesChange,
+  type OnNodesChange,
   type XYPosition,
 } from '@xyflow/react'
-import type { CameraDevice, PipelineSource, SourceType, OutputType } from './types'
+import {
+  OUTPUT_DEFAULT_PORTS,
+  OUTPUT_LABELS,
+  OUTPUT_TYPES,
+  SOURCE_TYPES,
+  isValidPipelinePair,
+  sanitizePath,
+  validateFlow,
+} from './flow'
+import type { CameraDevice, LogEntry, OutputType, PipelineSource, SourceType } from './types'
 
 let nodeIdCounter = 0
 const nextId = (type: string) => `${type}_${++nodeIdCounter}`
 
-const SOURCE_TYPES: SourceType[] = ['camera', 'rtspSource', 'rtmpSource', 'srtSource', 'hlsSource']
-const OUTPUT_TYPES: OutputType[] = ['rtspOutput', 'rtmpOutput', 'hlsOutput', 'webrtcOutput', 'srtOutput']
-
-const OUTPUT_DEFAULT_PORTS: Record<OutputType, number> = {
-  rtspOutput: 8554,
-  rtmpOutput: 1935,
-  hlsOutput: 8888,
-  webrtcOutput: 8889,
-  srtOutput: 8890,
-}
-
-const OUTPUT_LABELS: Record<OutputType, string> = {
-  rtspOutput: 'RTSP Output',
-  rtmpOutput: 'RTMP Output',
-  hlsOutput: 'HLS Output',
-  webrtcOutput: 'WebRTC Output',
-  srtOutput: 'SRT Output',
-}
+const DEFAULT_EDGE_STYLE = { stroke: '#58a6ff', strokeWidth: 2 }
+const ERROR_EDGE_STYLE = { stroke: '#f85149', strokeWidth: 2 }
+const STREAMING_EDGE_STYLE = { stroke: '#3fb950', strokeWidth: 2 }
 
 interface FlowState {
   nodes: Node[]
   edges: Edge[]
   cameras: CameraDevice[]
   isRunning: boolean
+  logs: LogEntry[]
 
   onNodesChange: OnNodesChange
   onEdgesChange: OnEdgesChange
@@ -50,23 +45,51 @@ interface FlowState {
   startFlow: () => Promise<void>
   stopFlow: () => Promise<void>
   updatePipelineStatus: (edgeId: string, status: string, error?: string) => void
+  addLog: (pipelineId: string, message: string) => void
+  clearLogs: () => void
 }
 
 function buildSource(node: Node): PipelineSource | null {
-  const d = node.data as Record<string, unknown>
+  const data = node.data as Record<string, unknown>
+
   switch (node.type) {
     case 'camera':
-      return { type: 'camera', device: d.device as string, index: d.deviceIndex as number }
+      return {
+        type: 'camera',
+        device: data.device as string,
+        index: data.deviceIndex as number,
+        resolution: data.resolution as string,
+      }
+
     case 'rtspSource':
-      return { type: 'rtspSource', url: d.url as string }
+      return { type: 'rtspSource', url: data.url as string }
+
     case 'rtmpSource':
-      return { type: 'rtmpSource', url: d.url as string }
+      return { type: 'rtmpSource', url: data.url as string }
+
     case 'srtSource':
-      return { type: 'srtSource', url: d.url as string }
+      return { type: 'srtSource', url: data.url as string }
+
     case 'hlsSource':
-      return { type: 'hlsSource', url: d.url as string }
+      return { type: 'hlsSource', url: data.url as string }
+
     default:
       return null
+  }
+}
+
+function resetNodeRuntime(node: Node): Node {
+  return {
+    ...node,
+    data: { ...node.data, status: 'idle', error: undefined, activePath: undefined },
+  }
+}
+
+function resetEdgeRuntime(edge: Edge): Edge {
+  return {
+    ...edge,
+    animated: false,
+    style: DEFAULT_EDGE_STYLE,
   }
 }
 
@@ -75,6 +98,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   edges: [],
   cameras: [],
   isRunning: false,
+  logs: [],
 
   onNodesChange: (changes) => {
     set({ nodes: applyNodeChanges(changes, get().nodes) })
@@ -85,7 +109,24 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   },
 
   onConnect: (connection) => {
-    set({ edges: addEdge({ ...connection, animated: false }, get().edges) })
+    if (!connection.source || !connection.target) {
+      return
+    }
+
+    const { nodes, edges } = get()
+    const sourceNode = nodes.find((node) => node.id === connection.source)
+    const targetNode = nodes.find((node) => node.id === connection.target)
+
+    if (!sourceNode || !targetNode || !isValidPipelinePair(sourceNode.type, targetNode.type)) {
+      return
+    }
+
+    const duplicate = edges.some((edge) => edge.source === connection.source && edge.target === connection.target)
+    if (duplicate) {
+      return
+    }
+
+    set({ edges: addEdge({ ...connection, animated: false }, edges) })
   },
 
   addNode: (type, position) => {
@@ -108,6 +149,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         srtSource: 'SRT Source',
         hlsSource: 'HLS Source',
       }
+
       data = {
         label: labels[type] || type,
         url: '',
@@ -129,10 +171,31 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   },
 
   updateNodeData: (nodeId, data) => {
+    const isConfigChange = Object.keys(data).some((key) => !['status', 'error', 'activePath'].includes(key))
+
     set({
-      nodes: get().nodes.map((node) =>
-        node.id === nodeId ? { ...node, data: { ...node.data, ...data } } : node
-      ),
+      nodes: get().nodes.map((node) => {
+        if (node.id !== nodeId) {
+          return node
+        }
+
+        const currentData = node.data as Record<string, unknown>
+        const resetData = isConfigChange
+          ? {
+              error: undefined,
+              status: currentData.status === 'error' ? 'idle' : currentData.status,
+            }
+          : {}
+
+        return {
+          ...node,
+          data: {
+            ...currentData,
+            ...data,
+            ...resetData,
+          },
+        }
+      }),
     })
   },
 
@@ -140,110 +203,175 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   listCameras: async () => {
     if (!window.relay) return
+
     const cameras = await window.relay.listCameras()
     set({ cameras })
-    const { nodes } = get()
-    if (cameras.length > 0) {
-      const updated = nodes.map((node) => {
-        if (node.type === 'camera' && node.data.device === 'Default') {
-          return {
-            ...node,
-            data: { ...node.data, device: cameras[0].name, deviceIndex: cameras[0].index },
-          }
-        }
-        return node
-      })
-      set({ nodes: updated })
+
+    if (cameras.length === 0) {
+      return
     }
+
+    set({
+      nodes: get().nodes.map((node) => {
+        if (node.type !== 'camera') {
+          return node
+        }
+
+        const nodeData = node.data as Record<string, unknown>
+        if (nodeData.device !== 'Default') {
+          return node
+        }
+
+        return {
+          ...node,
+          data: { ...node.data, device: cameras[0].name, deviceIndex: cameras[0].index },
+        }
+      }),
+    })
   },
 
   startFlow: async () => {
     if (!window.relay) return
-    const { nodes, edges } = get()
 
-    for (const edge of edges) {
-      const sourceNode = nodes.find((n) => n.id === edge.source)
-      const targetNode = nodes.find((n) => n.id === edge.target)
-      if (!sourceNode || !targetNode) continue
+    const resetNodes = get().nodes.map(resetNodeRuntime)
+    const resetEdges = get().edges.map(resetEdgeRuntime)
+    set({ logs: [], isRunning: false, nodes: resetNodes, edges: resetEdges })
 
-      const isSource = SOURCE_TYPES.includes(sourceNode.type as SourceType)
-      const isOutput = OUTPUT_TYPES.includes(targetNode.type as OutputType)
-      if (!isSource || !isOutput) continue
+    const { pipelineEdges, nodeErrors } = validateFlow(resetNodes, resetEdges)
 
-      const source = buildSource(sourceNode)
-      if (!source) continue
-
-      const targetData = targetNode.data as Record<string, unknown>
-
-      get().updateNodeData(sourceNode.id, { status: 'starting' })
-      get().updateNodeData(targetNode.id, { status: 'starting' })
-
+    if (nodeErrors.size > 0) {
       set({
-        edges: get().edges.map((e) =>
-          e.id === edge.id ? { ...e, animated: true, style: { stroke: '#3fb950', strokeWidth: 2 } } : e
-        ),
-      })
+        nodes: get().nodes.map((node) => {
+          const error = nodeErrors.get(node.id)
+          if (!error) {
+            return node
+          }
 
-      await window.relay.startPipeline({
-        id: edge.id,
-        source,
-        output: {
-          path: targetData.path as string,
-          port: targetData.port as number,
-        },
+          return {
+            ...node,
+            data: { ...node.data, status: 'error', error },
+          }
+        }),
       })
     }
 
-    set({ isRunning: true })
+    if (pipelineEdges.length === 0) {
+      return
+    }
+
+    let startedPipelines = 0
+
+    for (const edge of pipelineEdges) {
+      const nodes = get().nodes
+      const sourceNode = nodes.find((node) => node.id === edge.source)
+      const targetNode = nodes.find((node) => node.id === edge.target)
+      if (!sourceNode || !targetNode) {
+        continue
+      }
+
+      const source = buildSource(sourceNode)
+      if (!source) {
+        continue
+      }
+
+      const targetData = targetNode.data as Record<string, unknown>
+      const path = sanitizePath(targetData.path)
+
+      get().updateNodeData(sourceNode.id, { status: 'starting', activePath: path, error: undefined })
+      get().updateNodeData(targetNode.id, { status: 'starting', error: undefined })
+
+      set({
+        edges: get().edges.map((currentEdge) =>
+          currentEdge.id === edge.id
+            ? { ...currentEdge, animated: true, style: STREAMING_EDGE_STYLE }
+            : currentEdge
+        ),
+      })
+
+      try {
+        await window.relay.startPipeline({
+          id: edge.id,
+          source,
+          output: { path },
+        })
+        startedPipelines++
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to start pipeline'
+        get().updateNodeData(sourceNode.id, { status: 'error', error: message })
+        get().updateNodeData(targetNode.id, { status: 'error', error: message })
+        set({
+          edges: get().edges.map((currentEdge) =>
+            currentEdge.id === edge.id
+              ? { ...currentEdge, animated: false, style: ERROR_EDGE_STYLE }
+              : currentEdge
+          ),
+        })
+      }
+    }
+
+    set({ isRunning: startedPipelines > 0 })
   },
 
   stopFlow: async () => {
     if (!window.relay) return
-    await window.relay.stopAll()
 
+    await window.relay.stopAll()
     set({
       isRunning: false,
-      nodes: get().nodes.map((node) => ({
-        ...node,
-        data: { ...node.data, status: 'idle', error: undefined },
-      })),
-      edges: get().edges.map((edge) => ({
-        ...edge,
-        animated: false,
-        style: { stroke: '#58a6ff', strokeWidth: 2 },
-      })),
+      nodes: get().nodes.map(resetNodeRuntime),
+      edges: get().edges.map(resetEdgeRuntime),
     })
   },
 
   updatePipelineStatus: (edgeId, status, error) => {
     const { nodes, edges } = get()
-    const edge = edges.find((e) => e.id === edgeId)
-    if (!edge) return
+    const edge = edges.find((currentEdge) => currentEdge.id === edgeId)
+    if (!edge) {
+      return
+    }
 
-    const sourceNode = nodes.find((n) => n.id === edge.source)
-    const targetNode = nodes.find((n) => n.id === edge.target)
+    const sourceNode = nodes.find((node) => node.id === edge.source)
+    const targetNode = nodes.find((node) => node.id === edge.target)
 
-    if (sourceNode) get().updateNodeData(sourceNode.id, { status, error })
-    if (targetNode) get().updateNodeData(targetNode.id, { status, error })
+    if (sourceNode) {
+      get().updateNodeData(sourceNode.id, { status, error })
+    }
+
+    if (targetNode) {
+      get().updateNodeData(targetNode.id, { status, error })
+    }
+
+    const nextEdges = get().edges.map((currentEdge) =>
+      currentEdge.id === edgeId
+        ? {
+            ...currentEdge,
+            animated: status === 'streaming',
+            style:
+              status === 'streaming'
+                ? STREAMING_EDGE_STYLE
+                : status === 'error'
+                  ? ERROR_EDGE_STYLE
+                  : DEFAULT_EDGE_STYLE,
+          }
+        : currentEdge
+    )
 
     set({
-      edges: get().edges.map((e) =>
-        e.id === edgeId
-          ? {
-              ...e,
-              animated: status === 'streaming',
-              style: {
-                stroke: status === 'streaming' ? '#3fb950' : status === 'error' ? '#f85149' : '#58a6ff',
-                strokeWidth: 2,
-              },
-            }
-          : e
-      ),
+      edges: nextEdges,
+      isRunning: status === 'streaming' || nextEdges.some((currentEdge) => currentEdge.animated),
     })
-
-    if (status === 'stopped' || status === 'error') {
-      const anyRunning = get().edges.some((e) => e.animated)
-      if (!anyRunning) set({ isRunning: false })
-    }
   },
+
+  addLog: (pipelineId, message) => {
+    const entry: LogEntry = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      pipelineId,
+      message: message.trim(),
+      timestamp: Date.now(),
+    }
+
+    set({ logs: [...get().logs, entry].slice(-500) })
+  },
+
+  clearLogs: () => set({ logs: [] }),
 }))
