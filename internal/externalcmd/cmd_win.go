@@ -61,7 +61,7 @@ func addProcessToGroup(h windows.Handle, p *os.Process) error {
 	return nil
 }
 
-func (e *Cmd) runOSSpecific(env []string) error {
+func (c *Cmd) runOSSpecific(cmdstr string, env []string) error {
 	var cmd *exec.Cmd
 
 	// from Golang documentation:
@@ -71,17 +71,22 @@ func (e *Cmd) runOSSpecific(env []string) error {
 	// msiexec.exe and cmd.exe (and thus, all batch files), which have a different unquoting algorithm.
 	// In these or other similar cases, you can do the quoting yourself and provide the full command
 	// line in SysProcAttr.CmdLine, leaving Args empty.
-	if strings.HasPrefix(e.cmdstr, "cmd ") || strings.HasPrefix(e.cmdstr, "cmd.exe ") {
-		args := strings.TrimPrefix(strings.TrimPrefix(e.cmdstr, "cmd "), "cmd.exe ")
+	if strings.HasPrefix(cmdstr, "cmd ") || strings.HasPrefix(cmdstr, "cmd.exe ") {
+		args := strings.TrimPrefix(strings.TrimPrefix(cmdstr, "cmd "), "cmd.exe ")
+		args = expandEnv(args, c.Env)
 
 		cmd = exec.Command("cmd.exe")
 		cmd.SysProcAttr = &syscall.SysProcAttr{
 			CmdLine: args,
 		}
 	} else {
-		cmdParts, err := shellquote.Split(e.cmdstr)
+		cmdParts, err := shellquote.Split(cmdstr)
 		if err != nil {
 			return err
+		}
+
+		for i, part := range cmdParts {
+			cmdParts[i] = expandEnv(part, c.Env)
 		}
 
 		cmd = exec.Command(cmdParts[0], cmdParts[1:]...)
@@ -123,15 +128,15 @@ func (e *Cmd) runOSSpecific(env []string) error {
 	}()
 
 	select {
-	case <-e.terminate:
+	case <-c.terminate:
 		closeProcessGroup(g)
 		<-cmdDone
 		return errTerminated
 
-	case c := <-cmdDone:
+	case code := <-cmdDone:
 		closeProcessGroup(g)
-		if c != 0 {
-			return fmt.Errorf("command exited with code %d", c)
+		if code != 0 {
+			return fmt.Errorf("command exited with code %d", code)
 		}
 		return nil
 	}

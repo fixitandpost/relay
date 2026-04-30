@@ -12,10 +12,14 @@ import (
 	"github.com/kballard/go-shellquote"
 )
 
-func (e *Cmd) runOSSpecific(env []string) error {
-	cmdParts, err := shellquote.Split(e.cmdstr)
+func (c *Cmd) runOSSpecific(cmdstr string, env []string) error {
+	cmdParts, err := shellquote.Split(cmdstr)
 	if err != nil {
 		return err
+	}
+
+	for i, part := range cmdParts {
+		cmdParts[i] = expandEnv(part, c.Env)
 	}
 
 	cmd := exec.Command(cmdParts[0], cmdParts[1:]...)
@@ -48,7 +52,7 @@ func (e *Cmd) runOSSpecific(env []string) error {
 	}()
 
 	select {
-	case <-e.terminate:
+	case <-c.terminate:
 		// the minus is needed to kill all subprocesses
 		syscall.Kill(-cmd.Process.Pid, syscall.SIGINT) //nolint:errcheck
 		<-cmdDone
