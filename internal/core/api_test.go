@@ -10,14 +10,16 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"testing"
 	"time"
 
+	"github.com/bluenviron/gohlslib/v2"
 	"github.com/bluenviron/gortmplib"
 	rtmpcodecs "github.com/bluenviron/gortmplib/pkg/codecs"
 	"github.com/bluenviron/gortsplib/v5"
 	"github.com/bluenviron/gortsplib/v5/pkg/description"
+	"github.com/bluenviron/gortsplib/v5/pkg/format"
+	"github.com/bluenviron/gortsplib/v5/pkg/format/rtph264"
 	"github.com/bluenviron/mediacommon/v2/pkg/formats/mpegts"
 	tscodecs "github.com/bluenviron/mediacommon/v2/pkg/formats/mpegts/codecs"
 	srt "github.com/datarhei/gosrt"
@@ -99,8 +101,8 @@ func TestAPIPathsList(t *testing.T) {
 	}
 
 	t.Run("rtsp session", func(t *testing.T) {
-		p, ok := newInstance("api: yes\n" +
-			"paths:\n" +
+		p, ok := newInstance(t, "api: yes\n"+
+			"paths:\n"+
 			"  mypath:\n")
 		require.Equal(t, true, ok)
 		defer p.Close()
@@ -150,19 +152,14 @@ func TestAPIPathsList(t *testing.T) {
 	})
 
 	t.Run("rtsps session", func(t *testing.T) {
-		serverCertFpath, err := test.CreateTempFile(test.TLSCertPub)
-		require.NoError(t, err)
-		defer os.Remove(serverCertFpath)
+		serverCertFpath := test.CreateTempFile(t, test.TLSCertPub)
+		serverKeyFpath := test.CreateTempFile(t, test.TLSCertKey)
 
-		serverKeyFpath, err := test.CreateTempFile(test.TLSCertKey)
-		require.NoError(t, err)
-		defer os.Remove(serverKeyFpath)
-
-		p, ok := newInstance("api: yes\n" +
-			"rtspEncryption: optional\n" +
-			"rtspServerCert: " + serverCertFpath + "\n" +
-			"rtspServerKey: " + serverKeyFpath + "\n" +
-			"paths:\n" +
+		p, ok := newInstance(t, "api: yes\n"+
+			"rtspEncryption: optional\n"+
+			"rtspServerCert: "+serverCertFpath+"\n"+
+			"rtspServerKey: "+serverKeyFpath+"\n"+
+			"paths:\n"+
 			"  mypath:\n")
 		require.Equal(t, true, ok)
 		defer p.Close()
@@ -172,7 +169,7 @@ func TestAPIPathsList(t *testing.T) {
 		hc := &http.Client{Transport: tr}
 
 		source := gortsplib.Client{TLSConfig: &tls.Config{InsecureSkipVerify: true}}
-		err = source.StartRecording("rtsps://localhost:8322/mypath",
+		err := source.StartRecording("rtsps://localhost:8322/mypath",
 			&description.Session{Medias: []*description.Media{
 				test.UniqueMediaH264(),
 				test.UniqueMediaMPEG4Audio(),
@@ -197,10 +194,10 @@ func TestAPIPathsList(t *testing.T) {
 	})
 
 	t.Run("rtsp source", func(t *testing.T) {
-		p, ok := newInstance("api: yes\n" +
-			"paths:\n" +
-			"  mypath:\n" +
-			"    source: rtsp://127.0.0.1:1234/mypath\n" +
+		p, ok := newInstance(t, "api: yes\n"+
+			"paths:\n"+
+			"  mypath:\n"+
+			"    source: rtsp://127.0.0.1:1234/mypath\n"+
 			"    sourceOnDemand: yes\n")
 		require.Equal(t, true, ok)
 		defer p.Close()
@@ -226,10 +223,10 @@ func TestAPIPathsList(t *testing.T) {
 	})
 
 	t.Run("rtmp source", func(t *testing.T) {
-		p, ok := newInstance("api: yes\n" +
-			"paths:\n" +
-			"  mypath:\n" +
-			"    source: rtmp://127.0.0.1:1234/mypath\n" +
+		p, ok := newInstance(t, "api: yes\n"+
+			"paths:\n"+
+			"  mypath:\n"+
+			"    source: rtmp://127.0.0.1:1234/mypath\n"+
 			"    sourceOnDemand: yes\n")
 		require.Equal(t, true, ok)
 		defer p.Close()
@@ -255,10 +252,10 @@ func TestAPIPathsList(t *testing.T) {
 	})
 
 	t.Run("hls source", func(t *testing.T) {
-		p, ok := newInstance("api: yes\n" +
-			"paths:\n" +
-			"  mypath:\n" +
-			"    source: http://127.0.0.1:1234/mypath\n" +
+		p, ok := newInstance(t, "api: yes\n"+
+			"paths:\n"+
+			"  mypath:\n"+
+			"    source: http://127.0.0.1:1234/mypath\n"+
 			"    sourceOnDemand: yes\n")
 		require.Equal(t, true, ok)
 		defer p.Close()
@@ -285,8 +282,8 @@ func TestAPIPathsList(t *testing.T) {
 }
 
 func TestAPIPathsGet(t *testing.T) {
-	p, ok := newInstance("api: yes\n" +
-		"paths:\n" +
+	p, ok := newInstance(t, "api: yes\n"+
+		"paths:\n"+
 		"  all_others:\n")
 	require.Equal(t, true, ok)
 	defer p.Close()
@@ -354,13 +351,8 @@ func TestAPIPathsGet(t *testing.T) {
 }
 
 func TestAPIProtocolListGet(t *testing.T) {
-	serverCertFpath, err := test.CreateTempFile(test.TLSCertPub)
-	require.NoError(t, err)
-	defer os.Remove(serverCertFpath)
-
-	serverKeyFpath, err := test.CreateTempFile(test.TLSCertKey)
-	require.NoError(t, err)
-	defer os.Remove(serverKeyFpath)
+	serverCertFpath := test.CreateTempFile(t, test.TLSCertPub)
+	serverKeyFpath := test.CreateTempFile(t, test.TLSCertKey)
 
 	for _, ca := range []string{
 		"rtsp conns",
@@ -369,7 +361,8 @@ func TestAPIProtocolListGet(t *testing.T) {
 		"rtsps sessions",
 		"rtmp",
 		"rtmps",
-		"hls",
+		"hls sessions",
+		"hls muxers",
 		"webrtc",
 		"srt",
 	} {
@@ -391,7 +384,7 @@ func TestAPIProtocolListGet(t *testing.T) {
 			cnf += "paths:\n" +
 				"  all_others:\n"
 
-			p, ok := newInstance(cnf)
+			p, ok := newInstance(t, cnf)
 			require.Equal(t, true, ok)
 			defer p.Close()
 
@@ -405,7 +398,7 @@ func TestAPIProtocolListGet(t *testing.T) {
 			case "rtsp conns", "rtsp sessions":
 				source := gortsplib.Client{}
 
-				err = source.StartRecording("rtsp://localhost:8554/mypath?key=val",
+				err := source.StartRecording("rtsp://localhost:8554/mypath?key=val",
 					&description.Session{Medias: []*description.Media{medi}})
 				require.NoError(t, err)
 				defer source.Close()
@@ -415,7 +408,7 @@ func TestAPIProtocolListGet(t *testing.T) {
 					TLSConfig: &tls.Config{InsecureSkipVerify: true},
 				}
 
-				err = source.StartRecording("rtsps://localhost:8322/mypath?key=val",
+				err := source.StartRecording("rtsps://localhost:8322/mypath?key=val",
 					&description.Session{Medias: []*description.Media{medi}})
 				require.NoError(t, err)
 				defer source.Close()
@@ -439,7 +432,7 @@ func TestAPIProtocolListGet(t *testing.T) {
 				rawURL += "127.0.0.1:" + port + "/mypath?key=val"
 
 				var u *url.URL
-				u, err = url.Parse(rawURL)
+				u, err := url.Parse(rawURL)
 				require.NoError(t, err)
 
 				conn := &gortmplib.Client{
@@ -470,9 +463,9 @@ func TestAPIProtocolListGet(t *testing.T) {
 
 				time.Sleep(500 * time.Millisecond)
 
-			case "hls":
+			case "hls sessions", "hls muxers":
 				source := gortsplib.Client{}
-				err = source.StartRecording("rtsp://localhost:8554/mypath",
+				err := source.StartRecording("rtsp://localhost:8554/mypath",
 					&description.Session{Medias: []*description.Media{medi}})
 				require.NoError(t, err)
 				defer source.Close()
@@ -529,7 +522,7 @@ func TestAPIProtocolListGet(t *testing.T) {
 
 			case "webrtc":
 				source := gortsplib.Client{}
-				err = source.StartRecording("rtsp://localhost:8554/mypath",
+				err := source.StartRecording("rtsp://localhost:8554/mypath",
 					&description.Session{Medias: []*description.Media{medi}})
 				require.NoError(t, err)
 				defer source.Close()
@@ -570,7 +563,7 @@ func TestAPIProtocolListGet(t *testing.T) {
 				conf.StreamId = "publish:mypath:::key=val"
 
 				var conn srt.Conn
-				conn, err = srt.Dial("srt", "localhost:8890", conf)
+				conn, err := srt.Dial("srt", "localhost:8890", conf)
 				require.NoError(t, err)
 				defer conn.Close()
 
@@ -612,7 +605,10 @@ func TestAPIProtocolListGet(t *testing.T) {
 			case "rtmps":
 				pa = "rtmpsconns"
 
-			case "hls":
+			case "hls sessions":
+				pa = "hlssessions"
+
+			case "hls muxers":
 				pa = "hlsmuxers"
 
 			case "webrtc":
@@ -792,7 +788,24 @@ func TestAPIProtocolListGet(t *testing.T) {
 					},
 				}, out1)
 
-			case "hls":
+			case "hls sessions":
+				require.Equal(t, map[string]any{
+					"itemCount": float64(1),
+					"pageCount": float64(1),
+					"items": []any{
+						map[string]any{
+							"id":            out1.(map[string]any)["items"].([]any)[0].(map[string]any)["id"],
+							"created":       out1.(map[string]any)["items"].([]any)[0].(map[string]any)["created"],
+							"remoteAddr":    out1.(map[string]any)["items"].([]any)[0].(map[string]any)["remoteAddr"],
+							"path":          "mypath",
+							"query":         "",
+							"user":          "",
+							"outboundBytes": out1.(map[string]any)["items"].([]any)[0].(map[string]any)["outboundBytes"],
+						},
+					},
+				}, out1)
+
+			case "hls muxers":
 				require.Equal(t, map[string]any{
 					"itemCount": float64(1),
 					"pageCount": float64(1),
@@ -919,7 +932,7 @@ func TestAPIProtocolListGet(t *testing.T) {
 
 			var out2 any
 
-			if ca == "hls" {
+			if ca == "hls muxers" {
 				httpRequest(t, hc, http.MethodGet, "http://localhost:9997/v3/"+pa+"/get/"+
 					out1.(map[string]any)["items"].([]any)[0].(map[string]any)["path"].(string),
 					nil, &out2)
@@ -979,7 +992,7 @@ func TestAPIProtocolListGet(t *testing.T) {
 				out2.(map[string]any)["rtcpPacketsReceived"] = out1.(map[string]any)["items"].([]any)[0].(map[string]any)["rtcpPacketsReceived"]
 				out2.(map[string]any)["rtcpPacketsSent"] = out1.(map[string]any)["items"].([]any)[0].(map[string]any)["rtcpPacketsSent"]
 
-			case "hls":
+			case "hls muxers":
 				out2.(map[string]any)["lastRequest"] = out1.(map[string]any)["items"].([]any)[0].(map[string]any)["lastRequest"]
 			}
 
@@ -989,13 +1002,8 @@ func TestAPIProtocolListGet(t *testing.T) {
 }
 
 func TestAPIProtocolGetNotFound(t *testing.T) {
-	serverCertFpath, err := test.CreateTempFile(test.TLSCertPub)
-	require.NoError(t, err)
-	defer os.Remove(serverCertFpath)
-
-	serverKeyFpath, err := test.CreateTempFile(test.TLSCertKey)
-	require.NoError(t, err)
-	defer os.Remove(serverKeyFpath)
+	serverCertFpath := test.CreateTempFile(t, test.TLSCertPub)
+	serverKeyFpath := test.CreateTempFile(t, test.TLSCertKey)
 
 	for _, ca := range []string{
 		"rtsp conns",
@@ -1004,7 +1012,8 @@ func TestAPIProtocolGetNotFound(t *testing.T) {
 		"rtsps sessions",
 		"rtmp",
 		"rtmps",
-		"hls",
+		"hls sessions",
+		"hls muxers",
 		"webrtc",
 		"srt",
 	} {
@@ -1027,7 +1036,7 @@ func TestAPIProtocolGetNotFound(t *testing.T) {
 			cnf += "paths:\n" +
 				"  all_others:\n"
 
-			p, ok := newInstance(cnf)
+			p, ok := newInstance(t, cnf)
 			require.Equal(t, true, ok)
 			defer p.Close()
 
@@ -1055,7 +1064,10 @@ func TestAPIProtocolGetNotFound(t *testing.T) {
 			case "rtmps":
 				pa = "rtmpsconns"
 
-			case "hls":
+			case "hls sessions":
+				pa = "hlssessions"
+
+			case "hls muxers":
 				pa = "hlsmuxers"
 
 			case "webrtc":
@@ -1067,7 +1079,7 @@ func TestAPIProtocolGetNotFound(t *testing.T) {
 
 			func() {
 				var req *http.Request
-				req, err = http.NewRequest(http.MethodGet, "http://localhost:9997/v3/"+pa+"/get/"+uuid.New().String(), nil)
+				req, err := http.NewRequest(http.MethodGet, "http://localhost:9997/v3/"+pa+"/get/"+uuid.New().String(), nil)
 				require.NoError(t, err)
 
 				var res *http.Response
@@ -1081,10 +1093,10 @@ func TestAPIProtocolGetNotFound(t *testing.T) {
 				case "rtsp conns", "rtsps conns", "rtmp", "rtmps", "srt":
 					checkError(t, "connection not found", res.Body)
 
-				case "rtsp sessions", "rtsps sessions", "webrtc":
+				case "rtsp sessions", "rtsps sessions", "hls sessions", "webrtc":
 					checkError(t, "session not found", res.Body)
 
-				case "hls":
+				case "hls muxers":
 					checkError(t, "muxer not found", res.Body)
 				}
 			}()
@@ -1093,18 +1105,14 @@ func TestAPIProtocolGetNotFound(t *testing.T) {
 }
 
 func TestAPIProtocolKick(t *testing.T) {
-	serverCertFpath, err := test.CreateTempFile(test.TLSCertPub)
-	require.NoError(t, err)
-	defer os.Remove(serverCertFpath)
-
-	serverKeyFpath, err := test.CreateTempFile(test.TLSCertKey)
-	require.NoError(t, err)
-	defer os.Remove(serverKeyFpath)
+	serverCertFpath := test.CreateTempFile(t, test.TLSCertPub)
+	serverKeyFpath := test.CreateTempFile(t, test.TLSCertKey)
 
 	for _, ca := range []string{
 		"rtsp",
 		"rtsps",
 		"rtmp",
+		"hls",
 		"webrtc",
 		"srt",
 	} {
@@ -1121,7 +1129,7 @@ func TestAPIProtocolKick(t *testing.T) {
 			cnf += "paths:\n" +
 				"  all_others:\n"
 
-			p, ok := newInstance(cnf)
+			p, ok := newInstance(t, cnf)
 			require.Equal(t, true, ok)
 			defer p.Close()
 
@@ -1134,8 +1142,7 @@ func TestAPIProtocolKick(t *testing.T) {
 			switch ca {
 			case "rtsp":
 				source := gortsplib.Client{}
-
-				err = source.StartRecording("rtsp://localhost:8554/mypath",
+				err := source.StartRecording("rtsp://localhost:8554/mypath",
 					&description.Session{Medias: []*description.Media{medi}})
 				require.NoError(t, err)
 				defer source.Close()
@@ -1144,15 +1151,14 @@ func TestAPIProtocolKick(t *testing.T) {
 				source := gortsplib.Client{
 					TLSConfig: &tls.Config{InsecureSkipVerify: true},
 				}
-
-				err = source.StartRecording("rtsps://localhost:8322/mypath",
+				err := source.StartRecording("rtsps://localhost:8322/mypath",
 					&description.Session{Medias: []*description.Media{medi}})
 				require.NoError(t, err)
 				defer source.Close()
 
 			case "rtmp":
 				var u *url.URL
-				u, err = url.Parse("rtmp://localhost:1935/mypath")
+				u, err := url.Parse("rtmp://localhost:1935/mypath")
 				require.NoError(t, err)
 
 				conn := &gortmplib.Client{
@@ -1180,9 +1186,48 @@ func TestAPIProtocolKick(t *testing.T) {
 				err = w.WriteH264(track, 2*time.Second, 2*time.Second, [][]byte{{5, 2, 3, 4}})
 				require.NoError(t, err)
 
+			case "hls":
+				source := gortsplib.Client{}
+				err := source.StartRecording("rtsp://localhost:8554/mypath",
+					&description.Session{Medias: []*description.Media{medi}})
+				require.NoError(t, err)
+				defer source.Close()
+
+				var enc *rtph264.Encoder
+				enc, err = medi.Formats[0].(*format.H264).CreateEncoder()
+				require.NoError(t, err)
+
+				tracksReceived := make(chan struct{})
+
+				client := &gohlslib.Client{
+					URI: "http://localhost:8888/mypath/index.m3u8",
+					OnTracks: func(_ []*gohlslib.Track) error {
+						close(tracksReceived)
+						return nil
+					},
+				}
+				err = client.Start()
+				require.NoError(t, err)
+				defer client.Close()
+
+				time.Sleep(500 * time.Millisecond)
+
+				for i := range 2 {
+					var pkts []*rtp.Packet
+					pkts, err = enc.Encode([][]byte{{5, 2, 3, 4}})
+					require.NoError(t, err)
+
+					pkts[0].Timestamp = uint32(i * 90000)
+
+					err = source.WritePacketRTP(medi, pkts[0])
+					require.NoError(t, err)
+				}
+
+				<-tracksReceived
+
 			case "webrtc":
 				var u *url.URL
-				u, err = url.Parse("http://localhost:8889/mypath/whip")
+				u, err := url.Parse("http://localhost:8889/mypath/whip")
 				require.NoError(t, err)
 
 				track := &webrtc.OutgoingTrack{
@@ -1212,7 +1257,7 @@ func TestAPIProtocolKick(t *testing.T) {
 				conf.StreamId = "publish:mypath"
 
 				var conn srt.Conn
-				conn, err = srt.Dial("srt", "localhost:8890", conf)
+				conn, err := srt.Dial("srt", "localhost:8890", conf)
 				require.NoError(t, err)
 				defer conn.Close()
 
@@ -1243,6 +1288,9 @@ func TestAPIProtocolKick(t *testing.T) {
 			case "rtmp":
 				pa = "rtmpconns"
 
+			case "hls":
+				pa = "hlssessions"
+
 			case "webrtc":
 				pa = "webrtcsessions"
 
@@ -1256,6 +1304,7 @@ func TestAPIProtocolKick(t *testing.T) {
 				} `json:"items"`
 			}
 			httpRequest(t, hc, http.MethodGet, "http://localhost:9997/v3/"+pa+"/list", nil, &out1)
+			require.NotEmpty(t, out1.Items)
 
 			httpRequest(t, hc, http.MethodPost, "http://localhost:9997/v3/"+pa+"/kick/"+out1.Items[0].ID, nil, nil)
 
@@ -1271,18 +1320,14 @@ func TestAPIProtocolKick(t *testing.T) {
 }
 
 func TestAPIProtocolKickNotFound(t *testing.T) {
-	serverCertFpath, err := test.CreateTempFile(test.TLSCertPub)
-	require.NoError(t, err)
-	defer os.Remove(serverCertFpath)
-
-	serverKeyFpath, err := test.CreateTempFile(test.TLSCertKey)
-	require.NoError(t, err)
-	defer os.Remove(serverKeyFpath)
+	serverCertFpath := test.CreateTempFile(t, test.TLSCertPub)
+	serverKeyFpath := test.CreateTempFile(t, test.TLSCertKey)
 
 	for _, ca := range []string{
 		"rtsp",
 		"rtsps",
 		"rtmp",
+		"hls",
 		"webrtc",
 		"srt",
 	} {
@@ -1299,7 +1344,7 @@ func TestAPIProtocolKickNotFound(t *testing.T) {
 			cnf += "paths:\n" +
 				"  all_others:\n"
 
-			p, ok := newInstance(cnf)
+			p, ok := newInstance(t, cnf)
 			require.Equal(t, true, ok)
 			defer p.Close()
 
@@ -1318,6 +1363,9 @@ func TestAPIProtocolKickNotFound(t *testing.T) {
 			case "rtmp":
 				pa = "rtmpconns"
 
+			case "hls":
+				pa = "hlssessions"
+
 			case "webrtc":
 				pa = "webrtcsessions"
 
@@ -1327,7 +1375,7 @@ func TestAPIProtocolKickNotFound(t *testing.T) {
 
 			func() {
 				var req *http.Request
-				req, err = http.NewRequest(http.MethodPost, "http://localhost:9997/v3/"+pa+"/kick/"+uuid.New().String(), nil)
+				req, err := http.NewRequest(http.MethodPost, "http://localhost:9997/v3/"+pa+"/kick/"+uuid.New().String(), nil)
 				require.NoError(t, err)
 
 				var res *http.Response
@@ -1341,11 +1389,8 @@ func TestAPIProtocolKickNotFound(t *testing.T) {
 				case "rtsp conns", "rtsps conns", "rtmp", "rtmps", "srt":
 					checkError(t, "connection not found", res.Body)
 
-				case "rtsp sessions", "rtsps sessions", "webrtc":
+				case "rtsp sessions", "rtsps sessions", "hls", "webrtc":
 					checkError(t, "session not found", res.Body)
-
-				case "hls":
-					checkError(t, "muxer not found", res.Body)
 				}
 			}()
 		})

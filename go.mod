@@ -3,23 +3,23 @@ module github.com/bluenviron/mediamtx
 go 1.25.0
 
 require (
-	code.cloudfoundry.org/bytefmt v0.68.0
+	code.cloudfoundry.org/bytefmt v0.70.0
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/MicahParks/jwkset v0.11.0
 	github.com/MicahParks/keyfunc/v3 v3.8.0
 	github.com/abema/go-mp4 v1.5.0
 	github.com/alecthomas/kong v1.15.0
 	github.com/asticode/go-astits v1.15.0
-	github.com/bluenviron/gohlslib/v2 v2.2.9
+	github.com/bluenviron/gohlslib/v2 v2.3.0
 	github.com/bluenviron/gortmplib v0.3.1
-	github.com/bluenviron/gortsplib/v5 v5.5.1
+	github.com/bluenviron/gortsplib/v5 v5.5.2
 	github.com/bluenviron/mediacommon/v2 v2.8.3
 	github.com/datarhei/gosrt v0.10.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/gin-contrib/pprof v1.5.4
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-git/go-billy/v5 v5.8.0
-	github.com/go-git/go-git/v5 v5.17.2
+	github.com/go-git/go-git/v5 v5.18.0
 	github.com/goccy/go-yaml v1.19.2
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/gopacket v1.1.19
@@ -27,19 +27,19 @@ require (
 	github.com/gookit/color v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
-	github.com/matthewhartstonge/argon2 v1.5.1
+	github.com/matthewhartstonge/argon2 v1.5.2
 	github.com/minio/selfupdate v0.6.0
-	github.com/pion/ice/v4 v4.2.2
-	github.com/pion/interceptor v0.1.44
+	github.com/pion/ice/v4 v4.2.5
+	github.com/pion/interceptor v0.1.45
 	github.com/pion/logging v0.2.4
 	github.com/pion/rtcp v1.2.16
 	github.com/pion/rtp v1.10.1
 	github.com/pion/sdp/v3 v3.0.18
 	github.com/pion/transport/v4 v4.0.1
-	github.com/pion/webrtc/v4 v4.2.11
+	github.com/pion/webrtc/v4 v4.2.12
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/crypto v0.50.0
-	golang.org/x/net v0.52.0
+	golang.org/x/net v0.53.0
 	golang.org/x/sys v0.43.0
 	golang.org/x/term v0.42.0
 )
@@ -80,10 +80,10 @@ require (
 	github.com/pion/dtls/v3 v3.1.2 // indirect
 	github.com/pion/mdns/v2 v2.1.0 // indirect
 	github.com/pion/randutil v0.1.0 // indirect
-	github.com/pion/sctp v1.9.4 // indirect
+	github.com/pion/sctp v1.9.5 // indirect
 	github.com/pion/srtp/v3 v3.0.10 // indirect
-	github.com/pion/stun/v3 v3.1.1 // indirect
-	github.com/pion/turn/v4 v4.1.4 // indirect
+	github.com/pion/stun/v3 v3.1.2 // indirect
+	github.com/pion/turn/v5 v5.0.3 // indirect
 	github.com/pjbgf/sha1cd v0.3.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
@@ -98,7 +98,7 @@ require (
 	go.mongodb.org/mongo-driver/v2 v2.5.0 // indirect
 	golang.org/x/arch v0.22.0 // indirect
 	golang.org/x/text v0.36.0 // indirect
-	golang.org/x/time v0.12.0 // indirect
+	golang.org/x/time v0.14.0 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

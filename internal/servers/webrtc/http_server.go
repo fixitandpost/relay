@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"path"
 	"regexp"
 	"strings"
 	"time"
@@ -39,30 +40,34 @@ var (
 	reWHIPWHEPWithID = regexp.MustCompile("^/(.+?)/(whip|whep)/(.+?)$")
 )
 
-func mergePathAndQuery(path string, rawQuery string) string {
-	res := path
+func trailingSlashLocation(rawPath string, rawQuery string) string {
+	res := path.Clean(rawPath)
+	res = strings.TrimLeft(res, "/\\")
+	res = "/" + res + "/"
+
 	if rawQuery != "" {
 		res += "?" + rawQuery
 	}
+
 	return res
 }
 
 func sessionLocation(publish bool, path string, rawQuery string, secret uuid.UUID) string {
-	ret := "/" + path + "/"
+	res := "/" + path + "/"
 
 	if publish {
-		ret += "whip"
+		res += "whip"
 	} else {
-		ret += "whep"
+		res += "whep"
 	}
 
-	ret += "/" + secret.String()
+	res += "/" + secret.String()
 
 	if rawQuery != "" {
-		ret += "?" + rawQuery
+		res += "?" + rawQuery
 	}
 
-	return ret
+	return res
 }
 
 type httpServer struct {
@@ -194,7 +199,7 @@ func (s *httpServer) onWHIPPost(ctx *gin.Context, pathName string, publish bool)
 		return
 	}
 
-	offer, err := io.ReadAll(ctx.Request.Body)
+	offer, err := io.ReadAll(&customLimitReader{ctx.Request.Body, maxInboundSDPSize})
 	if err != nil {
 		return
 	}
@@ -260,7 +265,7 @@ func (s *httpServer) onWHIPPatch(ctx *gin.Context, pathName string, rawSecret st
 		return
 	}
 
-	byts, err := io.ReadAll(ctx.Request.Body)
+	byts, err := io.ReadAll(&customLimitReader{ctx.Request.Body, maxInboundSDPSize})
 	if err != nil {
 		return
 	}
@@ -403,8 +408,8 @@ func (s *httpServer) onRequest(ctx *gin.Context) {
 				s.onPage(ctx, ctx.Request.URL.Path[1:len(ctx.Request.URL.Path)-len("/publish")], true)
 
 			case ctx.Request.URL.Path[len(ctx.Request.URL.Path)-1] != '/':
-				ctx.Header("Location", mergePathAndQuery(ctx.Request.URL.Path+"/", ctx.Request.URL.RawQuery))
-				ctx.Writer.WriteHeader(http.StatusMovedPermanently)
+				ctx.Header("Location", trailingSlashLocation(ctx.Request.URL.Path, ctx.Request.URL.RawQuery))
+				ctx.Writer.WriteHeader(http.StatusFound)
 
 			default:
 				s.onPage(ctx, ctx.Request.URL.Path[1:len(ctx.Request.URL.Path)-1], false)

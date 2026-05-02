@@ -170,7 +170,7 @@ func (c *conn) onDescribe(ctx *gortsplib.ServerHandlerOnDescribeCtx,
 			return res, nil, err2
 		}
 
-		var terr2 defs.PathNoStreamAvailableError
+		var terr2 *defs.PathNoStreamAvailableError
 		if errors.As(res.Err, &terr2) {
 			return &base.Response{
 				StatusCode: base.StatusNotFound,
@@ -184,7 +184,7 @@ func (c *conn) onDescribe(ctx *gortsplib.ServerHandlerOnDescribeCtx,
 
 	if res.Redirect != "" {
 		return &base.Response{
-			StatusCode: base.StatusMovedPermanently,
+			StatusCode: base.StatusFound,
 			Header: base.Header{
 				"Location": base.HeaderValue{absoluteURL(ctx.Request, res.Redirect)},
 			},

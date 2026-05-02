@@ -609,6 +609,7 @@ func (p *Core) createResources(initial bool) error {
 			ReadTimeout:     p.conf.ReadTimeout,
 			WriteTimeout:    p.conf.WriteTimeout,
 			MuxerCloseAfter: p.conf.HLSMuxerCloseAfter,
+			ExternalCmdPool: p.externalCmdPool,
 			Metrics:         p.metrics,
 			PathManager:     p.pathManager,
 			Parent:          p,
@@ -1087,7 +1088,7 @@ func (p *Core) reloadConf(newConf *conf.Conf, calledByAPI bool) error {
 	return nil
 }
 
-// APIConfigSet is called by api.
+// APIConfigSet implements apiParent.
 func (p *Core) APIConfigSet(conf *conf.Conf) {
 	select {
 	case p.chAPIConfigSet <- conf:
